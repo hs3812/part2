@@ -23,7 +23,7 @@ static inline char n2c(int n)
     return n == 0 ? ' ' : n+'a'-1;
 }
 
-//Creates a bigram, which contains the matrix, frequency, and putative key
+//This creates a bigram "object", lol i mean a struct. Which contains the matrix, frequency, and putative key.(key at 1 instance)
 Bigram * bigram_construct(char *ciphertext, int key_length, char *p_key){
     int i,j;
     Bigram *B = malloc(sizeof(Bigram));
@@ -64,7 +64,7 @@ Bigram * bigram_construct(char *ciphertext, int key_length, char *p_key){
     }
     
     
-    if (!p_key) {                           // need to take care of outerhill climb caller, this way the struct has some portion unitialized
+    if (!p_key) {                           // need to take care of outerhill climb caller, this way the struct has some portion unitialized, which gives weird output
         return B;
     }
     else {
@@ -83,14 +83,14 @@ Bigram * bigram_construct(char *ciphertext, int key_length, char *p_key){
         
     }
 }
-//Destroy everything
+//This function destroy everything, clean up memory
 void bigram_destroy(Collection c){
     for (int i = 0; i<c.count; i++) {
         free(c.ptr_to_bigram_list[i]);
     }
 }
 
-//print the bigram matrix
+//This prints out the bigram struct
 void bigram_display(Bigram *B){
     int i,j;
     printf("\n");
@@ -105,6 +105,8 @@ void bigram_display(Bigram *B){
     }
 }
 
+
+//This is the implementation of the inner hill climb, as described on the paper
 int innerhill_climb(Bigram *B){
     int innerscore = d(B,english_bigram);
     int *round_key;
@@ -143,7 +145,7 @@ int d(Bigram *B, int **english_bigram){
     return sum_total;
 }
 
-//swap key elements kj and kj+i every round
+//The function swaps key elements kj and kj+i every time it is called, its fast because its swapping pointers
 void key_swap(int *round_key, int j, int i){
     int a,b;
     a = *(round_key+j*sizeof(int));
@@ -154,7 +156,7 @@ void key_swap(int *round_key, int j, int i){
 
 
 
-
+//This is the random_init_key part of the paper, it sets a high score in the beginning, calls inner hill climb, update the score, return the best score back to outer hill climb
 int random_init_key(int *freq_distribution, char *ciphertext){
     int bestinitscore = 100000;
     int *cipher_alphabet=NULL;
@@ -191,7 +193,7 @@ int random_init_key(int *freq_distribution, char *ciphertext){
 
 
 //Borrowed from https://github.com/alimony/homophonic-cipher-attack/blob/master/homophonic_cipher_matrix.cpp
-//modify later
+//This is borrowed from the above, it creates an initial key. Return to its caller
 char * create_key(int *freq_distribution){
     int i = 0;
     int j = 0;
@@ -261,7 +263,9 @@ char * create_key(int *freq_distribution){
     
     
 
-
+//This function is the outer hill climb part of the paper, it calles random_init key, gets a score, then, updates the score
+//The flow is, outer hill climb calls random init key, which calls inner hill climb
+//So this will return the best key among all the keys
 char * outerhill_climb(char *ciphertext, int key_length){
     int freq_distribution_index = 0;
     int freq_distribution[27];
@@ -330,7 +334,7 @@ char * outerhill_climb(char *ciphertext, int key_length){
 
 
 
-
+//Note these functions might not be needed. Please refer to the paper, and implement what is needed. Its ok if we fail some cases on part 2.
 /*
 
 void bigram_update();

@@ -11,7 +11,7 @@
 int english_bigram[26][26] = {
     // Source: http://norvig.com/mayzner.html and https://github.com/alimony/homophonic-cipher-attack/blob/master/e_hardcoded_values.h
     // Matrix is read by row and then column to get digram, e.g. row 'h' and column 'a' is the bigram 'ha'
-    //Bigram / 100 will get the percentage. For example, th is very common and is 3.56% of all bigrams
+    //Bigram / 100 will get the percentage. For example, 'th' is very common and is 3.56% of all bigrams
     //        a   b   c    d    e    f   g    h   i   j   k    l   m    n    o   p  q    r    s    t   u   v   w   x   y  z
     /* a */ { 0, 23, 45,  37,   1,   7, 20,   1,  32, 1, 10, 109, 28, 198,   0, 20, 0, 108,  87, 149, 12, 20,  6,  2, 22, 1},
     /* b */ {15,  1,  0,   0,  58,   0,  0,   0,  11, 2,  0,  23,  0,   0,  20,  0, 0,  11,   5,   2, 18,  0,  0,  0, 18, 0},
@@ -42,21 +42,24 @@ int english_bigram[26][26] = {
 };
 
 
+//This struct holds the ciphertext - key at 1 instance. This holds the key used at that instance, bigram, letter frequency, score and what the ciphter -key is
 typedef struct cipher{
     int key;
-    int bigram_array[26][26];  //not including space here, because the actual cipher is randomly chosen, not sure how many spaces
-    float letter_frequency[27];
+    int bigram_array[26][26];          //The size isn't [27][27]. Not including space here, because the actual cipher is randomly chosen, not sure how many spaces
+    float letter_frequency[27];         // Letter frequency, [0] = ' ', [1] = 'a' so on.
     float score;
-    char *ciphertext;
+    char *ciphertext;                   //pointer to a string of that instance
 }Cipher;
+
 //This collection is used to temporarily hold cipher struct, and to qsort them
+//This holds all the ciphertext - key for key = 0 to 26. This keeps all the data then allows for sorting, choosing top [key_length] candidates
 typedef struct collection_of_cipher{
-    Cipher *ptr[27];
+    Cipher *ptr[27];                    // This is an array of pointers that store the address of struct Cipher, which holds data of one instace
 }Collection;
 
 
 // Dict_freq is letter frequency distribution of our dictionary file
-//'e' appears 12% of the time
+//'e' appears 12% of the time. [0] = space, [1] is a........[26] is z
 //                      ' '       'a'       'b'      'c'       'd'      'e'         'f'     'g'
 float dict_freq[27]={0.100775, 0.038759, 0.020671, 0.043927, 0.031007, 0.121447, 0.010335,0.007751,
     0.023255, 0.077519, 0.0001, 0.002583, 0.041343, 0.028423, 0.051679, 0.064599, 0.031007, 0.0001, 0.064599,
@@ -85,8 +88,8 @@ static inline char n2c(int n)
 }
 
 
-//This function takes some ciphertext at 1 instance, and calcalte frequency & bigram distribution
-//It returns a ptr
+//This function takes 1 ciphertext - key , for key = 0 - 26.
+//Then it calculates scores and return a pointer to the struct
 Cipher * calculate_score(int putative_cipher[], int key, int array_len, int round){
     float score=0.0;
     float frequency = 0.0;
@@ -112,7 +115,7 @@ Cipher * calculate_score(int putative_cipher[], int key, int array_len, int roun
         
     }
     
-    
+    //This loop calculates the number of occurence of bigrams
     for (int i=0; i<array_len;i++) {
         int j=i+1;
         if (j==array_len-1) {
@@ -127,7 +130,7 @@ Cipher * calculate_score(int putative_cipher[], int key, int array_len, int roun
     
     
     
-    
+    //This loop calculates the numer of occurence of letters
     for (int i=0; i<array_len;i++) {
         if (i<27) {
             ptr->letter_frequency[i]=0;
@@ -146,6 +149,8 @@ Cipher * calculate_score(int putative_cipher[], int key, int array_len, int roun
         ptr->letter_frequency[putative_cipher[i]]=frequency/array_len;
         frequency=0.0;
     }
+    
+    //This loop translate ciphertext from number representation back to charater representation
     for (int i =0; i<array_len; i++) {
         tmp_array[i]=n2c(putative_cipher[i]);
     }
@@ -158,18 +163,22 @@ Cipher * calculate_score(int putative_cipher[], int key, int array_len, int roun
         perror("");
         return NULL;
     }
+    //This copies the ciphertext into a struct
     strlcpy(ptr->ciphertext, tmp_array, array_len+1);
     
+    
+    //This loop calculates frequency. Frequency score = frequency of this ciphertext at this instance - frequency that of the dictionary/standard english
     for (int i=0; i<27; i++) {
         if (round == 0) {           //This is used to tune, see which gives a better accuracy.
             score=score+fabs(ptr->letter_frequency[i]-dict_freq[i]);
         }
         else{
             score = score + powf((fabs(ptr->letter_frequency[i]-dict_freq[i])),2)/dict_freq[i];  //This we can toggle between eng_freq or dict_freq
+            //This is a chi square test on how related two frequencies are
         }
     }
     
-    
+    //This loop calculates the total number of bigram pairs in the ciphertext at this instance
     for (int i=0; i<26; i++) {
         for (int j=0; j<26; j++) {
             total_num_of_bigram = total_num_of_bigram+ptr->bigram_array[i][j];
@@ -179,7 +188,7 @@ Cipher * calculate_score(int putative_cipher[], int key, int array_len, int roun
     
     
     
-    
+    //This loop sums up the total score
     double sum_total=0;
     for (int i=0; i<26; i++) {
         for (int j=0; j<26; j++) {
@@ -191,7 +200,10 @@ Cipher * calculate_score(int putative_cipher[], int key, int array_len, int roun
     ptr->score=score+(double)sum_total;
     return ptr;
 }
-//This displays a collection struct
+
+
+//This displays the content of a collection struct. The struct holds the 27 ciphertext at 27 instance.(key 0 - 26)
+
 void display_cipher(Cipher *ptr, int number){
     printf("\n");
     printf("\n");
@@ -211,6 +223,7 @@ void display_cipher(Cipher *ptr, int number){
     printf("\n");
 }
 
+
 //This is to free up memory, needs to check if everything is freed
 //I haven't checked because i am in a rush
 void destroy_everything(Collection *collection){
@@ -224,6 +237,7 @@ void destroy_everything(Collection *collection){
 }
 
 //Compare for Qsort
+//The smaller the score, the higher the rank.
 int comparefun(const void* p1, const void* p2){
     
     Cipher *left_struct = *(Cipher**)p1;
@@ -240,15 +254,15 @@ int comparefun(const void* p1, const void* p2){
     
 }
 
-//This function determines likely keys, by sorting ptr->lowest score
-int *determine_likely_key(Collection *collection, int key_length){   //parameter should include key length, to be added later
-    int *keys = calloc(key_length, sizeof(int)); // The first parameter should be key length
+//This function determines likely keys, by sorting the scores
+int *determine_likely_key(Collection *collection, int key_length){
+    int *keys = calloc(key_length, sizeof(int));
     if (!keys) {
         return NULL;
     }
     qsort(collection->ptr, 27, sizeof(Cipher*), comparefun);
     
-    for (int i =0; i<key_length; i++) {   // change to i<key_length later
+    for (int i =0; i<key_length; i++) {
         *(keys+i)=collection->ptr[i]->key;
     }
     
@@ -256,7 +270,9 @@ int *determine_likely_key(Collection *collection, int key_length){   //parameter
     return keys;
 }
 
-//This function breaks ciphertext into segments, and just like how you break vigenere cipher
+
+//This function breaks ciphertext into a number of segments, and just like how you break vigenere cipher up
+
 char ** segmentation(char ciphertext[], int key_length, int cipher_length  ){
     int index[key_length];
     
@@ -281,6 +297,7 @@ char ** segmentation(char ciphertext[], int key_length, int cipher_length  ){
         
     }
     
+    //This loop copies one char to index [0][0],[1][1]........... so the resulting segments look like how you break up vigenere cipher
     for (int j = 0; j < cipher_length; j++) {
         dptr[j % key_length][index[j % key_length]] = ciphertext[j];
         index[j % key_length]++;
@@ -290,7 +307,7 @@ char ** segmentation(char ciphertext[], int key_length, int cipher_length  ){
 
 
 
-
+//This is the decryption function, it takes a list of keys and decrypt the ciphertext
 void decryption(int *keys, char ciphertext[], int key_length, int cipher_length) {
     
     char temp[cipher_length+1];
@@ -316,24 +333,25 @@ int main(int argc, const char * argv[]) {
     char ciphertext[501];
     int key_length;
     
+    //Argument checking
     if (argc <3) {
         printf("Usage:./program -t [NUM]\n");
         printf("num is the length of the key!\n");
         return 0;
     }
     
-    
+     //Argument checking
     if (strcmp(argv[1], "-t")!=0) {
         printf("option not valid");
         return 0;
     }
-    
+     //Argument checking
     key_length = atoi(argv[2]);
     if (key_length<0 || key_length>24) {
         printf("key length is between 0-24");
         return EXIT_FAILURE;
     }
-    
+     //Argument checking
     printf("Enter the ciphertext:");
     if(fgets(ciphertext,501,stdin)==NULL){
         printf("reading failed");
@@ -345,7 +363,7 @@ int main(int argc, const char * argv[]) {
         return EXIT_FAILURE;
     }
     
-    
+    //Aloocate memory for the collection, which holds structs that hold data
     Collection *collection = malloc(sizeof(Collection));
     if (!collection) {
         perror("");
@@ -356,7 +374,7 @@ int main(int argc, const char * argv[]) {
     }
     
     
-    
+    //This loop goes from key = 0 to 26, each round creates an instance of a ciphertext-key. Calculate score
     while (key<27) {
         int temp[500];
         for (int i = 0; i<500; i++) {
@@ -382,7 +400,7 @@ int main(int argc, const char * argv[]) {
         }
         
     }
-    
+    //This loop prints out all the 27 ciphertext at 27 instances
     for (int k=0; k<27; k++) {
         display_cipher(collection->ptr[k], k);
     }
@@ -406,10 +424,16 @@ int main(int argc, const char * argv[]) {
     printf("\n");
     destroy_everything(collection);
     
-    int cipher_length = sizeof(ciphertext)/sizeof(char);
-    char **segment = segmentation(ciphertext,key_length, cipher_length);
     
-    int index[key_length];
+    
+    //The following part, is a second round of ciphertext - key. This time, the difference is that it is calculating frequency score on segments of the cipher
+    
+    //Those segments come from the function segmentation. This loop tells the likely key, for each character
+    //This is why it works for non linear key scheduler
+    int cipher_length = sizeof(ciphertext)/sizeof(char);
+    char **segment = segmentation(ciphertext,key_length, cipher_length); // creating segments
+    
+    int index[key_length];                      //This index, holds the likely key to each charater position
     
     
     for (int i=0; i<key_length; i++) {
@@ -458,6 +482,9 @@ int main(int argc, const char * argv[]) {
         index[i]=collection->ptr[0]->key;
         
     }
+    
+    
+    
     printf("\nThe likely keys of the second round are:");
     printf("\nNote:this is more accuract when dealing with linear key scheduler, like j(i)= xxx mod t\n");
     

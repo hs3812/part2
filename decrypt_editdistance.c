@@ -44,7 +44,7 @@ int english_bigram[26][26] = {
 };
 
 
-
+//This holds the 40 words of the dictionary
 char *dictionary[40]={
     "awesomeness",
     "hearkened",
@@ -89,7 +89,7 @@ char *dictionary[40]={
     
 };
 
-
+//Same as another file
 typedef struct cipher{
     int key;
     int bigram_array[26][26];  //not including space here, because the actual cipher is randomly chosen, not sure how many spaces
@@ -354,6 +354,14 @@ void decryption(int *keys, char ciphertext[], int key_length, int cipher_length)
     printf("The plaintext is:%s",temp);
 }
 //Reference https://www.lemoda.net/c/levenshtein/
+
+
+//This calculates the edit distance, of two giving string
+//It returns the distance, as a integer. This denotes how many shift/substitution needed to convert string 1 to string 2
+//This is normally implemented some spell suggestion. Like when you type into google search, it will suggest spelling based on edit distance.
+//This is what I think might work on part 2, we recover the key[key_len] partially, apply the permutation of keys to 1 word of a ciphertext, then, calculate edit distance
+//There must be 1 permutation of the key, that makes the cipher word close enough to its plaintext origin.
+//Otherwise, its either we set a threshold to high, or the key length is too long that essentially make the ciphertext close to one time pad
 static int distance (const char * word1,int len1,const char * word2,int len2){
     int matrix[len1 + 1][len2 + 1];
     int i;
@@ -398,8 +406,15 @@ static int distance (const char * word1,int len1,const char * word2,int len2){
     return matrix[len1][len2];
 }
 
+
 int found = 0;
+//This is a bad implementation of brute force. It takes as input a word from ciphertext string, assuming the word is of length 5.
+//It then, does cipher word - key[i]. I have not implemented the function to permute the key
+//Right now, it calculate cipher word - key[i], from i = 1 to key length
+//We need a better way to implement this
 int brute_force(char ciphertext[], int *keys, int key_length, int start, int end){
+    
+    //This is a private struct that holds some compound data. It holds the edit distance at 1 instance, and the index. This index is the index of our 40 word dictionary
     typedef struct min_score {
         int distance;
         int index;
@@ -414,7 +429,7 @@ int brute_force(char ciphertext[], int *keys, int key_length, int start, int end
     int temp[15];
     char temp1[15];
     int tmp_str=start;
-    
+    //This loop takes a word, translate it to int, and translate it back to char
     while (i<key_length) {
         memset(temp,0, sizeof(temp));
         memset(temp1, 0, sizeof(temp1));
@@ -435,6 +450,8 @@ int brute_force(char ciphertext[], int *keys, int key_length, int start, int end
     
         temp1[end-start+1]='\0';
         int min =10,d,index;
+        //This loop calculates the edit distance, keeping track of the minimum edit distance, and the index to the dictionary word that gives this score
+        //It means to most similar word, to our cipher word at 1 instance.
         for (int j = 0; j<40; j++) {
             d=distance(dictionary[j], strlen(dictionary[j]), temp, strlen(temp1));
             if (d<min) {
@@ -443,6 +460,7 @@ int brute_force(char ciphertext[], int *keys, int key_length, int start, int end
             }
             
         }
+        //put data into a struct
         SCORE *ptr = malloc(sizeof(SCORE));
         if (!ptr) {
             printf("\nno memory for SCORE!\n");
@@ -452,6 +470,8 @@ int brute_force(char ciphertext[], int *keys, int key_length, int start, int end
         array[i]=ptr;
         i++;
 }
+    
+    //Now, after the while loop finishes, loop through our data struct, looking for the minimum edit distance, and the index that gives that edit distance
     int min=10;
     int index;
     for (int i=0; i<key_length; i++) {
@@ -461,6 +481,11 @@ int brute_force(char ciphertext[], int *keys, int key_length, int start, int end
         }
     }
     
+    //Here, if the edit distance is smaller than 4, meaning a dictionary word can be substitute/shifted to a cipherword, within 4 operation, then this is likely
+    //the plaintext of that word.
+    
+    
+    //However, the threshold needs to be dynamic, it should vary according to key length. The longer the key length, the higher the threshold.
     if (min<=4) {
         printf("\n %s ",dictionary[index]);
         for (int i=0; i<key_length; i++) {
@@ -575,8 +600,8 @@ int main(int argc, const char * argv[]) {
     int start = 0;
     int end = 4;
     
-    while (start+end<strlen(ciphertext)-8) {//bad way to implement, need to change later
-        while (!brute_force(ciphertext,keys,key_length, start, end) && end<13) {
+    while (start+end<strlen(ciphertext)-8) {                //bad way to implement, need to change later. This is hardcoded.
+        while (!brute_force(ciphertext,keys,key_length, start, end) && end<13) {//This loop stops, if found a similar word, or reaches word-len 13.(max word len)
             end++;
         }
         if (found) {
