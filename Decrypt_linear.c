@@ -501,7 +501,7 @@ int main(int argc, const char * argv[]) {
     }
     free(segment);
     
-    
+    //Needs to run some checks
     return 0;
 }
 
